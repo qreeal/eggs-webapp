@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="ru" class="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Редактор | Vision Engine</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* Кастомные стили для ползунков, чтобы они выглядели современно */
+    input[type=range] {
+      -webkit-appearance: none;
+      width: 100%;
+      background: transparent;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      height: 16px; width: 16px;
+      border-radius: 50%;
+      background: #3b82f6;
+      cursor: pointer;
+      margin-top: -6px;
+    }
+    input[type=range]::-webkit-slider-runnable-track {
+      width: 100%; height: 4px;
+      cursor: pointer;
+      background: #4b5563;
+      border-radius: 2px;
+    }
+  </style>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen font-sans flex overflow-hidden">
+
+  <!-- Сайдбар с контролами -->
+  <aside class="w-80 bg-gray-800 border-r border-gray-700 flex flex-col h-screen shrink-0 shadow-2xl z-10">
+    <div class="p-6 border-b border-gray-700">
+      <h2 class="text-xl font-bold text-white flex items-center gap-2">
+        <svg class="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
+        Параметры
+      </h2>
+      <p class="text-xs text-gray-400 mt-1 truncate">{{ source_name }}</p>
+    </div>
+
+    <div class="p-6 overflow-y-auto flex-grow space-y-6">
+      
+      <!-- Яркость -->
+      <div>
+        <div class="flex justify-between items-center mb-2">
+          <label class="text-sm font-medium text-gray-300">Яркость</label>
+          <span id="bright-val" class="text-xs font-mono bg-gray-700 px-2 py-1 rounded text-gray-300">0</span>
+        </div>
+        <input type="range" id="brightness" min="-100" max="100" value="0" oninput="queueUpdate()">
+      </div>
+
+      <!-- Контрастность -->
+      <div>
+        <div class="flex justify-between items-center mb-2">
+          <label class="text-sm font-medium text-gray-300">Контрастность</label>
+          <span id="contrast-val" class="text-xs font-mono bg-gray-700 px-2 py-1 rounded text-gray-300">1.0</span>
+        </div>
+        <input type="range" id="contrast" min="0.1" max="3.0" step="0.1" value="1.0" oninput="queueUpdate()">
+      </div>
+
+      <!-- Размытие -->
+      <div>
+        <div class="flex justify-between items-center mb-2">
+          <label class="text-sm font-medium text-gray-300">Размытие (Blur)</label>
+          <span id="blur-val" class="text-xs font-mono bg-gray-700 px-2 py-1 rounded text-gray-300">1</span>
+        </div>
+        <input type="range" id="blur" min="1" max="51" step="2" value="1" oninput="queueUpdate()">
+      </div>
+
+      <!-- Сглаживание -->
+      <div>
+        <div class="flex justify-between items-center mb-2">
+          <label class="text-sm font-medium text-gray-300">Сглаживание (Bilateral)</label>
+          <span id="smooth-val" class="text-xs font-mono bg-gray-700 px-2 py-1 rounded text-gray-300">0</span>
+        </div>
+        <input type="range" id="smooth" min="0" max="150" step="5" value="0" oninput="queueUpdate()">
+      </div>
+
+      <!-- Чекбокс Негатив -->
+      <label class="flex items-center gap-3 p-3 bg-gray-750 rounded-lg border border-gray-700 cursor-pointer hover:bg-gray-700 transition-colors">
+        <input type="checkbox" id="negative" onchange="queueUpdate()" class="w-4 h-4 text-blue-600 bg-gray-900 border-gray-600 rounded focus:ring-blue-500">
+        <span class="text-sm font-medium text-gray-300">Негатив (Инверсия)</span>
+      </label>
+    </div>
+
+    <!-- Кнопки внизу сайдбара -->
+    <div class="p-6 border-t border-gray-700 bg-gray-850 space-y-3">
+      <button onclick="downloadImage()" class="w-full flex justify-center items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-medium py-2.5 px-4 rounded-lg transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+        Скачать
+      </button>
+      <div class="flex gap-3">
+        <button onclick="resetFilters()" class="flex-1 bg-gray-700 hover:bg-gray-600 text-gray-200 font-medium py-2.5 px-4 rounded-lg transition-colors text-sm">
+          Сбросить
+        </button>
+        <a href="/" class="flex-1 text-center bg-gray-700 hover:bg-gray-600 text-gray-200 font-medium py-2.5 px-4 rounded-lg transition-colors text-sm">
+          Выход
+        </a>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Область холста (картинки) -->
+  <main class="flex-grow bg-gray-900 relative flex items-center justify-center p-8 overflow-hidden bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMCIgaGVpZ2h0PSIyMCI+CjxyZWN0IHdpZHRoPSIyMCIgaGVpZ2h0PSIyMCIgZmlsbD0iIzExMTgxNyI+PC9yZWN0Pgo8Y2lyY2xlIGN4PSIyIiBjeT0iMiIgcj0iMSIgZmlsbD0iIzFmMjkzNyI+PC9jaXJjbGU+Cjwvc3ZnPg==')]">
+    
+    <div id="loader" class="absolute hidden flex-col items-center justify-center inset-0 bg-gray-900/50 backdrop-blur-sm z-20">
+      <div class="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+    </div>
+
+    <img id="result-img" src="data:image/png;base64,{{ original_b64 }}" class="max-w-full max-h-full object-contain rounded shadow-2xl drop-shadow-[0_0_25px_rgba(0,0,0,0.8)] border border-gray-700 transition-opacity duration-150">
+  </main>
+
+  <input type="hidden" id="session-filename" value="{{ session_filename }}">
+
+  <script>
+    let updateTimeout = null;
+    let isRequesting = false;
+    let needsAnotherUpdate = false;
+
+    function resetFilters() {
+      document.getElementById('brightness').value = 0;
+      document.getElementById('contrast').value = 1.0;
+      document.getElementById('blur').value = 1;
+      document.getElementById('smooth').value = 0;
+      document.getElementById('negative').checked = false;
+      queueUpdate();
+    }
+
+    function queueUpdate() {
+      document.getElementById('bright-val').innerText = document.getElementById('brightness').value;
+      document.getElementById('contrast-val').innerText = document.getElementById('contrast').value;
+      document.getElementById('blur-val').innerText = document.getElementById('blur').value;
+      document.getElementById('smooth-val').innerText = document.getElementById('smooth').value;
+
+      if (isRequesting) { needsAnotherUpdate = true; return; }
+      if (updateTimeout) clearTimeout(updateTimeout);
+      updateTimeout = setTimeout(sendRequest, 50);
+    }
+
+    async function sendRequest() {
+      isRequesting = true;
+      needsAnotherUpdate = false;
+      
+      const imgEl = document.getElementById('result-img');
+
+      const payload = {
+        filename: document.getElementById('session-filename').value,
+        brightness: parseInt(document.getElementById('brightness').value),
+        contrast: parseFloat(document.getElementById('contrast').value),
+        blur: parseInt(document.getElementById('blur').value),
+        smooth: parseInt(document.getElementById('smooth').value),
+        negative: document.getElementById('negative').checked
+      };
+
+      try {
+        const response = await fetch('/api/interactive', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (response.ok) {
+          const data = await response.json();
+          imgEl.src = "data:image/png;base64," + data.result_b64;
+        }
+      } catch (err) {
+        console.error("Ошибка обновления:", err);
+      } finally {
+        isRequesting = false;
+        if (needsAnotherUpdate) queueUpdate();
+      }
+    }
+
+    function downloadImage() {
+      const link = document.createElement('a');
+      link.href = document.getElementById('result-img').src;
+      let cleanName = document.getElementById('session-filename').value.replace('upload_', ''); 
+      cleanName = cleanName.split('.')[0] + '_edited.png';
+      link.download = cleanName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  </script>
+</body>
+</html>

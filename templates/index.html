@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="ru" class="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vision Engine | Яйца и Помидоры</title>
+  <!-- Подключаем Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: { extend: { colors: { gray: { 850: '#1f2937', 900: '#111827' } } } }
+    }
+  </script>
+</head>
+
+
+<!-- Оверлей загрузки -->
+<div id="loading-overlay"
+     class="fixed inset-0 bg-black/70 flex flex-col items-center justify-center z-50 hidden bg-cover bg-center"
+     style="background-image: url('{{ url_for('static', filename='loading-bg.png') }}');">
+  <div class="flex flex-col items-center gap-8 px-8 bg-black/70 rounded-3xl p-10"
+       style="transform: scale(1.5);">
+    <!-- Спиннер -->
+    <div class="w-20 h-20 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+
+    <!-- Текст -->
+    <div class="text-center space-y-3">
+      <p class="text-2xl font-semibold text-gray-100">Обрабатываем изображение...</p>
+      <p id="fact-text" class="text-base text-gray-300 max-w-xl"></p>
+    </div>
+  </div>
+</div>
+
+
+
+<body class="bg-gray-900 text-gray-100 min-h-screen flex flex-col font-sans antialiased relative">
+<!-- Фоновая картинка -->
+  <div 
+    class="pointer-events-none fixed inset-0 -z-10 bg-cover bg-center opacity-30"
+    style="background-image: url('{{ url_for('static', filename='bg-main.png') }}');">
+  </div>
+
+  <!-- Навигация -->
+  <nav class="bg-gray-800 border-b border-gray-700 shadow-lg">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-16">
+        <div class="flex items-center gap-3">
+          <svg class="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+          <span class="font-bold text-xl tracking-tight text-white">Vision Engine</span>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Основной контент -->
+  <main class="flex-grow flex items-center justify-center p-6">
+    <div class="bg-gray-800 rounded-2xl shadow-2xl border border-gray-700 p-8 w-full max-w-xl">
+      <h2 class="text-2xl font-bold mb-6 text-center text-gray-100">Анализ изображений</h2>
+      {% if error_message %}
+      <div class="mb-4 px-4 py-3 rounded-lg bg-red-900/70 border border-red-600 text-red-100 text-sm">
+        {{ error_message }}
+      </div>
+      {% endif %}
+
+      <form id="main-form" action="/process" method="post" enctype="multipart/form-data" onsubmit="resetFormSoon()">
+        
+        <!-- Выбор из базы -->
+        <div class="mb-6">
+          <label class="block text-sm font-medium text-gray-400 mb-2">1. Выбрать из базы (Train Images)</label>
+          <select name="train_file" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors cursor-pointer appearance-none">
+            <option value="">-- Не выбрано --</option>
+            {% for f in train_files %}
+              <option value="{{ f }}">{{ f }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="relative flex py-2 items-center mb-6">
+            <div class="flex-grow border-t border-gray-600"></div>
+            <span class="flex-shrink-0 mx-4 text-gray-500 text-sm">ИЛИ</span>
+            <div class="flex-grow border-t border-gray-600"></div>
+        </div>
+
+        <!-- Загрузка файла -->
+        <div class="mb-8">
+          <label class="block text-sm font-medium text-gray-400 mb-2">2. Загрузить своё изображение</label>
+          <input type="file" name="image" accept="image/*" class="w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700 transition-all cursor-pointer bg-gray-700 border border-gray-600 rounded-lg p-2">
+        </div>
+
+        <!-- Кнопки действий -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <button type="submit" name="action" value="segment" class="w-full flex justify-center items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold py-3 px-4 rounded-xl shadow-lg transform hover:-translate-y-0.5 transition-all">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
+            Сегментация
+          </button>
+          
+          <button type="submit" name="action" value="letter" class="w-full flex justify-center items-center gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold py-3 px-4 rounded-xl shadow-lg transform hover:-translate-y-0.5 transition-all">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+            Распознать букву
+          </button>
+          
+          <button type="submit" name="action" value="interactive" class="w-full md:col-span-2 flex justify-center items-center gap-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-semibold py-3 px-4 rounded-xl shadow-lg transform hover:-translate-y-0.5 transition-all">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
+            Интерактивный редактор
+          </button>
+        </div>
+      </form>
+    </div>
+  </main>
+
+    <script>
+    const facts = [
+      "Перепелиные яйца содержат примерно в 5 раз больше фосфора, чем куриные.",
+      "Перепелиные яйца почти не вызывают аллергию и часто используются в детском питании.",
+      "В Японии перепелиные яйца добавляют в суши и бенто как популярный ингредиент.",
+      "Перепелиные яйца богаты холином, который важен для работы мозга и памяти.",
+      "Масса перепелиного яйца обычно около 10–12 граммов.",
+      "Помидоры черри появились в Южной Америке и были одомашнены ещё индейцами.",
+      "Помидоры черри содержат много ликопина — антиоксиданта, полезного для сердца.",
+      "Из-за высокого содержания сахаров помидоры черри часто слаще обычных томатов.",
+      "Жёлтые черри-помидоры обычно менее кислые, чем красные, и мягче на вкус.",
+      "В 100 граммах помидоров черри всего около 30 калорий."
+    ];
+
+    function showLoadingWithRandomFact() {
+      const overlay = document.getElementById('loading-overlay');
+      const factEl = document.getElementById('fact-text');
+      if (!overlay || !factEl) return;
+
+      const idx = Math.floor(Math.random() * facts.length);
+      factEl.textContent = facts[idx];
+
+      overlay.classList.remove('hidden');
+    }
+
+    function resetFormSoon() {
+      setTimeout(() => {
+        const form = document.getElementById('main-form');
+        if (form) form.reset();
+      }, 200);
+    }
+
+    // Вешаем обработчик на форму: показываем лоадер ТОЛЬКО для сегментации
+    document.addEventListener('DOMContentLoaded', () => {
+      const form = document.getElementById('main-form');
+      if (!form) return;
+
+      form.addEventListener('submit', (e) => {
+        const submitter = e.submitter; // кнопка, по которой кликнули
+        if (!submitter) return;
+
+        const actionVal = submitter.value;
+        if (actionVal === 'segment') {
+          showLoadingWithRandomFact();
+        }
+        // для других кнопок (letter, interactive) — без загрузочного экрана
+      });
+    });
+  </script>
+</body>
+</html>

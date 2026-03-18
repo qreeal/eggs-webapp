@@ -1,0 +1,17 @@
+# Python / venv
+__pycache__/
+*.pyc
+venv/
+.env
+
+# IDE
+.vscode/
+.idea/
+
+# Временные изображения сессий
+session_images/
+
+# Логи (если будут)
+*.log
+
+.model/FastSAM-x.pt
